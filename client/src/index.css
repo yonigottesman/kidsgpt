@@ -59,7 +59,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: calc(100vh - 1rem);
+  min-height: calc(100vh - 3rem);
   /* max-height: calc(100vh - 100rem); */
   background-color: #c6dbee;
   max-width: 80rem;

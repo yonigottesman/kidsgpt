@@ -4,10 +4,11 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { MoonLoader } from 'react-spinners';
 import { css } from '@emotion/react';
+import ReactGA from "react-ga4";
 
+ReactGA.initialize("G-V444GYWSE1");
 
-
-function ResponseBox({ question, answer }) {
+function ResponseBox({ question, answer, audio_base64 }) {
   const style = {
     backgroundColor: '#F0F8FF',
     padding: '1em',
@@ -17,25 +18,45 @@ function ResponseBox({ question, answer }) {
     textAlign: 'center',
     maxWidth: '100em', // Set a max width to limit the size of the box
   };
+  const handlePlayAudio = () => {
 
+    const audioData = atob(audio_base64);
+    const audioArrayBuffer = new ArrayBuffer(audioData.length);
+    const audioArray = new Uint8Array(audioArrayBuffer);
+    for (let i = 0; i < audioData.length; i++) {
+      audioArray[i] = audioData.charCodeAt(i);
+    }
+    // create a new blob from the audio data
+    const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
+    // create a new URL for the audio blob
+    const audioUrl = URL.createObjectURL(audioBlob);
+    // create a new audio object and set its source to the audio URL
+    const audio = new Audio(audioUrl);
+    // play the audio immediately
+    audio.volume = 1.0;
+    audio.play();
+  };
   return (
     <div style={style}>
       <p style={{ fontWeight: 'bold' }}>{question}</p>
       <p>{answer}</p>
+      {audio_base64 && (
+        <button onClick={handlePlayAudio}>Play Audio</button>
+      )}
     </div>
   );
 }
 
 function App() {
-  const [isRecording, setIsRecording] = useState(false);
   const [responses, setResponses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const mediaRecorderRef = useRef(null);
-  const [selectedLanguage, setSelectedLanguage] = useState('he');
-
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const startTimeRef = useRef(null);
   // const apiUrl = `${process.env.REACT_APP_BACKEND_IP}/ask`;
   // const apiUrl = "http://127.0.0.1:8000/ask"
-  const apiUrl = "https://api-dot-personal-ai-264306.oa.r.appspot.com/ask"
+
+  const apiUrl = "https://api-dot-personal-ai-264306.oa.r.appspot.com/ask" //TODO YONIGO: pass through env variable
 
 
   const handleLanguageChange = (event) => {
@@ -44,13 +65,12 @@ function App() {
 
   const startRecording = () => {
     console.log("start recording")
+    startTimeRef.current = Date.now();
     try {
       navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then((stream) => {
-        console.log("start recording2")
         let mediaRecorder;
         try {
-          console.log("start recording3")
-          mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4;codecs:opus' });
           console.log("mp4");
         }
         catch (err1) {
@@ -58,68 +78,44 @@ function App() {
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
           console.log("webm");
         }
-        console.log("yoni0");
         mediaRecorderRef.current = mediaRecorder;
         mediaRecorderRef.current.addEventListener('dataavailable', onRecordingReady);
         mediaRecorderRef.current.start();
-        console.log("yoni1");
-        setIsRecording(true);
       });
     } catch (err1) {
-      console.log("failed")
       console.log(err1)
     }
-
   };
 
   const stopRecording = () => {
     console.log("stop recording")
-
     if (mediaRecorderRef.current) {
-      console.log("yoni2");
       mediaRecorderRef.current.stop();
     }
-    console.log("yoni3");
-    setIsRecording(false);
   };
 
   const onRecordingReady = (e) => {
-    const mt = mediaRecorderRef.current.mimeType
-    console.log("mt", mt)
-    const audioData = new Blob([e.data], { type: mt });
+    const duration = Date.now() - startTimeRef.current;
+    if (duration < 1000) {
+      console.log(`Recording duration ${duration}ms is less than 2 seconds, not sending recording.`);
+      return;
+    }
+
     const formData = new FormData();
+
+    const audioData = new Blob([e.data], { type: mediaRecorderRef.current.mimeType });
     const fileExtension = mediaRecorderRef.current.mimeType.includes('webm') ? 'webm' : 'mp4';
     formData.append('audio', audioData, `audio.${fileExtension}`);
+
     const strippedResponses = responses.map(({ question, answer, audio }) => ({ question, answer }));
     formData.append('previous_responses', JSON.stringify(strippedResponses));
+
     formData.append('language', selectedLanguage);
     setIsLoading(true);
     axios.post(apiUrl, formData)
       .then((response) => {
-        const newText = response.data;
-        setResponses([...responses.slice(-1), newText]); // keep only the latest 3 responses
-
-
-        // decode the base64-encoded audio data
-        const audioData = atob(newText.audio_base64);
-        const audioArrayBuffer = new ArrayBuffer(audioData.length);
-        const audioArray = new Uint8Array(audioArrayBuffer);
-        for (let i = 0; i < audioData.length; i++) {
-          audioArray[i] = audioData.charCodeAt(i);
-        }
-
-        // create a new blob from the audio data
-        const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
-
-        // create a new URL for the audio blob
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        // create a new audio element and set the source to the URL
-        const audio = new Audio(audioUrl);
-
-        // play the audio
-
-        audio.play();
+        const newResponseData = response.data;
+        setResponses([newResponseData]); // keep only 1 response, change this if you want more context
         setIsLoading(false);
       })
       .catch((error) => {
@@ -148,7 +144,6 @@ function App() {
     border-color: red;
   `;
 
-
   return (
 
     <div className="app-container">
@@ -167,13 +162,12 @@ function App() {
       <div className="content-container">
 
         {responses.map((response, index) => (
-          <ResponseBox key={index} question={response.question} answer={response.answer} />
+          <ResponseBox key={index} question={response.question} answer={response.answer} audio_base64={response.audio_base64} />
         ))}
 
         <button className="record-button" onContextMenu={(e) => e.preventDefault()}
           onTouchCancel={handlePointerCancel} onTouchStart={handlePointerDown} onTouchEnd={handlePointerUp}
           onMouseDown={handlePointerDown} onMouseUp={handlePointerUp}>
-          {/* {isRecording ? 'Recording...' : 'Record'} */}
         </button>
         <br />
         {isLoading && (
@@ -183,12 +177,11 @@ function App() {
         )}
 
         <div className="footer">
+          <a href="https://github.com/yonigottesman/kidsgpt" target="_blank" rel="noreferrer">Code</a> {" | "}
           Made for my kids.{" "}
           <a href="https://yonigottesman.github.io/" target="_blank" rel="noreferrer"> Yoni Gottesman </a>
         </div>
       </div>
-
-
     </div>
 
   );

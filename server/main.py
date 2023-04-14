@@ -1,13 +1,11 @@
-import asyncio
 import base64
 import io
 import json
-import logging
 import os
 import tempfile
 
+import ffmpeg
 import google.cloud.texttospeech as tts
-import moviepy.editor as mp
 import openai
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,16 +14,22 @@ app = FastAPI()
 
 OPENAI_AI_KEY = os.environ["OPENAI_KEY"]
 CHATGPT_MODEL = "gpt-3.5-turbo"
+
 STARTING_PROMPT = """
 you are a teacher aimed to answer questions to a 6 year old kid. the kid has limited vocabulary,
 so you should use simple words and short sentences. 
 Also the kid does not have a good understanding of the world, science or math.
 """
-VOICE_NAME = {"en": "en-US-Neural2-C", "he": "he-IL-Standard-A", "ru": "ru-RU-Standard-A"}
+
+VOICE_NAME = {
+    "en": "en-US-Neural2-C",
+    "he": "he-IL-Standard-A",
+    "ru": "ru-RU-Standard-A",
+}
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO YONIGO change to specific origin
+    allow_origins=["*"],  # TODO YONIGO change to specific origin?
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,12 +44,19 @@ async def get_text_from_audio(audio: UploadFile, language: str):
         whisper_output = await openai.Audio.atranscribe("whisper-1", f, api_key=OPENAI_AI_KEY, language=language)
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, audio.filename), "wb") as f:
+            mp4_input = os.path.join(tmpdir, audio.filename)
+            with open(mp4_input, "wb") as f:
                 f.write(await audio.read())
-            audio_input = mp.AudioFileClip(os.path.join(tmpdir, audio.filename))
-            audio_input.write_audiofile(os.path.join(tmpdir, "audio.wav"))
-            with open(os.path.join(tmpdir, "audio.wav"), "rb") as f:
-                whisper_output = await openai.Audio.atranscribe("whisper-1", f, api_key=OPENAI_AI_KEY, language="en")
+            webm_output = os.path.join(tmpdir, "audio.webm")
+            ffmpeg.input(mp4_input).output(
+                webm_output,
+                **{"lossless": 1, "vcodec": "libvpx-vp9", "acodec": "libopus", "crf": 30, "b:v": 0, "b:a": "192k"},
+            ).run()
+
+            with open(webm_output, "rb") as f:
+                whisper_output = await openai.Audio.atranscribe(
+                    "whisper-1", f, api_key=OPENAI_AI_KEY, language=language
+                )
 
     print(f"whisper output: {whisper_output['text'][:100]}")
     return whisper_output
