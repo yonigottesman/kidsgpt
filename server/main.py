@@ -98,15 +98,9 @@ async def query_chatgpt(whisper_output, previous_responses):
 @app.post("/ask")
 async def ask(audio: UploadFile = File(...), previous_responses: str = Form(...), language: str = Form(...)):
     whisper_output = await get_text_from_audio(audio, language)
-    # whisper_output = {"text": "why is the sky blue?"}
     chatgpt_output = await query_chatgpt(whisper_output, previous_responses)
-    # chatgpt_output = {
-    #     "choices": [{"message": {"content": "The sky is the big blue space above us where we see the sun"}}]
-    # }
-
     audio_base64 = await text_to_wav(chatgpt_output["choices"][0]["message"]["content"], language)
 
-    # audio_base64 = open("/tmp/yoni.csv", "r").read()
     response_dict = {
         "question": whisper_output["text"],
         "answer": chatgpt_output["choices"][0]["message"]["content"],
