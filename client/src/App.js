@@ -33,7 +33,7 @@ function ResponseBox({ question, answer, audio_base64 }) {
     // create a new audio object and set its source to the audio URL
     const audio = new Audio(audioUrl);
     // play the audio immediately
-    audio.volume = 1.0;
+    audio.setAttribute('playsinline', ''); // add the 'playsinline' attribute
     audio.play();
   };
   return (
