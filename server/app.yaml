@@ -1,0 +1,10 @@
+runtime: python39
+service: api
+entrypoint: uvicorn --port $PORT main:app
+
+env_variables:
+  OPENAI_KEY: "openai secret key"
+
+basic_scaling:
+  max_instances: 11
+  idle_timeout: 10m

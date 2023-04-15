@@ -5,6 +5,8 @@ import axios from 'axios';
 import { MoonLoader } from 'react-spinners';
 import { css } from '@emotion/react';
 import ReactGA from "react-ga4";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
 ReactGA.initialize("G-V444GYWSE1");
 
@@ -18,6 +20,8 @@ function ResponseBox({ question, answer, audio_base64 }) {
     textAlign: 'center',
     maxWidth: '100em', // Set a max width to limit the size of the box
   };
+
+
   const handlePlayAudio = () => {
 
     const audioData = atob(audio_base64);
@@ -33,15 +37,20 @@ function ResponseBox({ question, answer, audio_base64 }) {
     // create a new audio object and set its source to the audio URL
     const audio = new Audio(audioUrl);
     // play the audio immediately
-    audio.setAttribute('playsinline', ''); // add the 'playsinline' attribute
-    audio.play();
+
+    // audio.play();
+    return audioUrl;
+
   };
+
   return (
     <div style={style}>
       <p style={{ fontWeight: 'bold' }}>{question}</p>
       <p>{answer}</p>
       {audio_base64 && (
-        <button onClick={handlePlayAudio}>Play Audio</button>
+        <audio key={audio_base64} controls autoplay>
+          <source src={handlePlayAudio(audio_base64)} type="audio/wav" />
+        </audio>
       )}
     </div>
   );
@@ -53,11 +62,18 @@ function App() {
   const mediaRecorderRef = useRef(null);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const startTimeRef = useRef(null);
-  // const apiUrl = `${process.env.REACT_APP_BACKEND_IP}/ask`;
+  // const apiUrl = `${process.env.REACT_APP_BACKEND_IP}/ask`; //does not work with app engine
   // const apiUrl = "http://127.0.0.1:8000/ask"
 
-  const apiUrl = "https://api-dot-personal-ai-264306.oa.r.appspot.com/ask" //TODO YONIGO: pass through env variable
+  const apiUrl = // your backend url
 
+
+
+  const microphoneIcon = (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ width: '1em', height: '1em', verticalAlign: 'middle', fill: 'currentColor' }}>
+      {/* Your path or polygon elements here */}
+    </svg>
+  );
 
   const handleLanguageChange = (event) => {
     setSelectedLanguage(event.target.value);
@@ -168,7 +184,10 @@ function App() {
         <button className="record-button" onContextMenu={(e) => e.preventDefault()}
           onTouchCancel={handlePointerCancel} onTouchStart={handlePointerDown} onTouchEnd={handlePointerUp}
           onMouseDown={handlePointerDown} onMouseUp={handlePointerUp}>
+          <span className="microphone-icon"><FontAwesomeIcon icon={faMicrophone} /></span>
         </button>
+
+
         <br />
         {isLoading && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

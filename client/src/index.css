@@ -13,7 +13,6 @@
   width: 100%;
 }
 
-
 .footer a {
   color: #626060;
   ;
@@ -36,6 +35,12 @@
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
+
+.microphone-icon {
+  /* margin-right: 0.5em; */
+  font-size: 3.5em;
+}
+
 
 .record-button:active {
   background-color: #FF5252;
